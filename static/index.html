@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Мессенджер</title>
+<style>
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font: 15px/1.4 system-ui, sans-serif; background: #f4f5f7; color: #1c1e21; }
+  .center { min-height: 100vh; display: grid; place-items: center; }
+  .card { background: #fff; padding: 24px; border-radius: 12px; width: 340px; box-shadow: 0 6px 24px rgba(0,0,0,.08); }
+  h2 { margin: 0 0 16px; font-size: 18px; }
+  input, textarea, button { font: inherit; }
+  input, textarea { width: 100%; padding: 10px; border: 1px solid #d0d3d8; border-radius: 8px; margin-bottom: 10px; }
+  button { padding: 9px 14px; border: 0; border-radius: 8px; background: #2563eb; color: #fff; cursor: pointer; }
+  button.ghost { background: #e8eaee; color: #1c1e21; }
+  #error { color: #b91c1c; font-size: 13px; min-height: 18px; margin: 0; }
+
+  #app { display: flex; height: 100vh; }
+  #sidebar { width: 270px; border-right: 1px solid #e3e5e9; background: #fff; display: flex; flex-direction: column; }
+  .me { padding: 12px; border-bottom: 1px solid #e3e5e9; font-size: 13px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  #users { list-style: none; margin: 0; padding: 0; overflow: auto; flex: 1; }
+  #users li { padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #f0f1f3; }
+  #users li:hover { background: #f4f5f7; }
+  #users li.active { background: #e6efff; }
+
+  #chat { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #chat-header { padding: 12px; border-bottom: 1px solid #e3e5e9; background: #fff; font-weight: 600; }
+  #messages { flex: 1; overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+  .msg { max-width: 70%; padding: 8px 12px; border-radius: 12px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.06); word-wrap: break-word; }
+  .msg.mine { align-self: flex-end; background: #2563eb; color: #fff; }
+  .msg .time { display: block; font-size: 11px; opacity: .6; margin-top: 4px; }
+  .empty { color: #6b7280; margin: auto; }
+  #composer { display: flex; gap: 8px; padding: 12px; border-top: 1px solid #e3e5e9; background: #fff; }
+  #composer textarea { margin: 0; resize: none; height: 44px; }
+</style>
+</head>
+<body>
+
+<div id="auth" class="center">
+  <div class="card">
+    <h2>Мессенджер</h2>
+    <input id="email" type="email" placeholder="email" autocomplete="username" />
+    <input id="password" type="password" placeholder="пароль" autocomplete="current-password" />
+    <div style="display:flex; gap:8px;">
+      <button id="btn-login" style="flex:1">Войти</button>
+      <button id="btn-reg" class="ghost" style="flex:1">Регистрация</button>
+    </div>
+    <p id="error"></p>
+  </div>
+</div>
+
+<div id="app" hidden>
+  <aside id="sidebar">
+    <div class="me">
+      <span id="me-email"></span>
+      <button id="btn-logout" class="ghost" style="padding:4px 8px; font-size:12px">Выйти</button>
+    </div>
+    <ul id="users"></ul>
+  </aside>
+  <main id="chat">
+    <div id="chat-header">Выберите собеседника</div>
+    <div id="messages"></div>
+    <form id="composer" hidden>
+      <textarea id="text" placeholder="Сообщение… (Enter — отправить)"></textarea>
+      <button type="submit">Отправить</button>
+    </form>
+  </main>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+let token = localStorage.getItem("token");
+let me = null;      // текущий пользователь
+let peer = null;    // собеседник
+let poll = null;    // таймер автообновления диалога
+
+async function api(path, { method = "GET", body } = {}) {
+  const headers = {};
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  if (token) headers["Authorization"] = "Bearer " + token;
+
+  const res = await fetch(path, {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
+  const raw = await res.text();
+  let data = null;
+  try { data = raw ? JSON.parse(raw) : null; } catch { data = raw; }
+
+  if (!res.ok) {
+    if (res.status === 401) logout();
+    const detail = data && data.detail;
+    throw new Error(typeof detail === "string" ? detail : (raw || res.statusText));
+  }
+  return data;
+}
+
+function showError(msg) { $("error").textContent = msg || ""; }
+
+async function login(path, body) {
+  showError("");
+  try {
+    const data = await api(path, { method: "POST", body });
+    token = data.access_token;
+    localStorage.setItem("token", token);
+    await start();
+  } catch (e) {
+    showError(e.message);
+  }
+}
+
+async function start() {
+  me = await api("/app/users/me");
+  $("me-email").textContent = `${me.email} (#${me.id})`;
+  $("auth").hidden = true;
+  $("app").hidden = false;
+  await loadUsers();
+}
+
+async function loadUsers() {
+  const users = await api("/app/users");
+  const ul = $("users");
+  ul.innerHTML = "";
+  users.filter(u => u.id !== me.id).forEach(u => {
+    const li = document.createElement("li");
+    li.textContent = `${u.email} (#${u.id})`;
+    li.dataset.id = u.id;
+    if (peer && peer.id === u.id) li.classList.add("active");
+    li.onclick = () => openDialog(u);
+    ul.appendChild(li);
+  });
+}
+
+function openDialog(user) {
+  peer = user;
+  $("chat-header").textContent = `${user.email} (#${user.id})`;
+  $("composer").hidden = false;
+  document.querySelectorAll("#users li").forEach(li =>
+    li.classList.toggle("active", Number(li.dataset.id) === user.id));
+  $("messages").innerHTML = "";
+  loadMessages();
+  clearInterval(poll);
+  poll = setInterval(loadMessages, 2000);
+}
+
+async function loadMessages() {
+  if (!peer) return;
+  const list = await api(`/app/messages/dialog/${peer.id}`);
+  const box = $("messages");
+  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+
+  box.innerHTML = "";
+  if (list.length === 0) {
+    const d = document.createElement("div");
+    d.className = "empty";
+    d.textContent = "Сообщений пока нет";
+    box.appendChild(d);
+  }
+  for (const m of list) {
+    const d = document.createElement("div");
+    d.className = "msg" + (m.sender_id === me.id ? " mine" : "");
+    d.textContent = m.text;
+    const t = document.createElement("span");
+    t.className = "time";
+    t.textContent = new Date(m.created_at).toLocaleString();
+    d.appendChild(t);
+    box.appendChild(d);
+  }
+  if (atBottom) box.scrollTop = box.scrollHeight;
+}
+
+function logout() {
+  token = null; me = null; peer = null;
+  localStorage.removeItem("token");
+  clearInterval(poll);
+  $("app").hidden = true;
+  $("auth").hidden = false;
+}
+
+$("btn-login").onclick = () => login("/app/users/auth", {
+  email: $("email").value, password: $("password").value,
+});
+
+$("btn-reg").onclick = async () => {
+  showError("");
+  const creds = { email: $("email").value, password: $("password").value };
+  try {
+    await api("/app/users/reg", { method: "POST", body: creds });
+    await login("/app/users/auth", creds);   // после регистрации сразу логиним
+  } catch (e) {
+    showError(e.message);
+  }
+};
+
+$("btn-logout").onclick = logout;
+
+$("composer").onsubmit = async (e) => {
+  e.preventDefault();
+  const text = $("text").value.trim();
+  if (!text || !peer) return;
+  $("text").value = "";
+  try {
+    await api("/app/messages", {
+      method: "POST",
+      body: { recipient_id: peer.id, text },
+    });
+    await loadMessages();
+  } catch (err) {
+    alert(err.message);
+  }
+};
+
+$("text").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    $("composer").requestSubmit();
+  }
+});
+
+(async function init() {
+  if (!token) return;
+  try { await start(); } catch { logout(); }
+})();
+</script>
+</body>
+</html>

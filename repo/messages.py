@@ -19,16 +19,23 @@ class MessagesRepo:
         self.db.refresh(message)
         return message
 
-    def get_dialog(self, user_a: int, user_b: int):
-        stmt = (
-            select(MessagesTable).where(
-                or_(
-                    and_(MessagesTable.sender_id == user_a,
-                         MessagesTable.recipient_id == user_b),
-                    and_(MessagesTable.sender_id == user_b,
-                         MessagesTable.recipient_id == user_a),
-                )
-            )
-            .order_by(MessagesTable.created_at)
+    def get_dialog(self, user_a: int, user_b: int, limit: int = 50, before_id: int | None = None) -> list[MessagesTable]:
+        pair = or_(
+            and_(
+                MessagesTable.sender_id == user_a,
+                MessagesTable.recipient_id == user_a,
+            ),
+            and_(
+                MessagesTable.sender_id == user_b,
+                MessagesTable.recipient_id == user_a,
+            ),
         )
-        return self.db.scalars(stmt).all()
+        stmt = select(MessagesTable).where(pair)
+        if before_id is not None:
+            stmt = stmt.where(MessagesTable.id < before_id)
+
+        # последние limit сообщений
+        stmt = stmt.order_by(MessagesTable.id.desc()).limit(limit)
+        rows = list(self.db.scalars(stmt))
+        rows.reverse()
+        return rows

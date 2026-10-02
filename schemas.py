@@ -1,21 +1,30 @@
-from pydantic import BaseModel, EmailStr, ConfigDict
 from datetime import datetime
 
-class Registration(BaseModel):
-    email: EmailStr
-    password: str
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
+
+
+class EmailIn(BaseModel):
+    email: EmailStr = Field(max_length=255)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        return value.strip().lower()
+
+
+class Registration(EmailIn):
+    password: str = Field(min_length=8, max_length=128)
+
+
+class Authenticate(EmailIn):
+    password: str = Field(min_length=1, max_length=128)
 
 
 class UserRead(BaseModel):
     id: int
-    email: str
+    email: EmailStr
 
     model_config = ConfigDict(from_attributes=True)
-
-
-class Authenticate(BaseModel):
-    email: EmailStr
-    password: str
 
 
 class TokenOut(BaseModel):
@@ -24,8 +33,16 @@ class TokenOut(BaseModel):
 
 
 class MessageCreate(BaseModel):
-    recipient_id: int
-    text: str
+    recipient_id: int = Field(gt=0)
+    text: str = Field(min_length=1, max_length=4000)
+
+    @field_validator("text")
+    @classmethod
+    def strip_text(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("Message text cannot be empty")
+        return cleaned
 
 
 class MessageRead(BaseModel):

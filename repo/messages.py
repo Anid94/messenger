@@ -23,7 +23,7 @@ class MessagesRepo:
         pair = or_(
             and_(
                 MessagesTable.sender_id == user_a,
-                MessagesTable.recipient_id == user_a,
+                MessagesTable.recipient_id == user_b,
             ),
             and_(
                 MessagesTable.sender_id == user_b,

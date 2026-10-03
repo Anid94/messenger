@@ -17,7 +17,7 @@ class UsersRepo:
     def get_by_id(self, user_id) -> UsersTable | None:
         return self.db.get(UsersTable, user_id)
 
-    def list(self, limit: int = 100, offcet: int = 0) -> list[UsersTable]:
+    def list(self, limit: int = 100, offset: int = 0) -> list[UsersTable]:
         result = select(UsersTable).order_by(UsersTable.id).limit(limit).offset(offset)
         return list(self.db.scalars(result))
 

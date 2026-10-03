@@ -19,7 +19,7 @@ def get_user_service(db: Session = Depends(get_db)) -> UserService:
 def get_users(
         limit: int = Query(100, ge=1, le=200),
         offset: int = Query(0, ge=0),
-        _: UserService = Depends(get_user_service),
+        _: UsersTable = Depends(get_current_user),
         service: UserService = Depends(get_user_service),
 ):
     return service.list_users(limit=limit, offset=offset)

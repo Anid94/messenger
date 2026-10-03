@@ -113,7 +113,7 @@ def downgrade() -> None:
     )
     op.alter_column(
         "users",
-        "create_at",
+        "created_at",
         existing_type=sa.DateTime(timezone=True),
         type_=sa.DateTime(),
         existing_nullable=False,

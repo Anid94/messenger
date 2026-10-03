@@ -44,6 +44,16 @@ def update_me(
     return service.update_profile(current_user, payload.username, payload.display_name)
 
 
+@router.get("/search", response_model=list[UserPublic])
+def search_users(
+        query: str = Query(..., min_length=1, max_length=32),
+        limit: int = Query(20, ge=1, le=50),
+        current_user: UsersTable = Depends(get_current_user),
+        service: UserService = Depends(get_user_service),
+):
+    return service.search_users(current_user.id, query, limit)
+
+
 @router.post(
     "/reg",
     response_model=UserMe,

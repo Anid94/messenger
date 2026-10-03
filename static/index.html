@@ -26,12 +26,17 @@
   .me-tag { font-size: 12px; color: #6b7280; }
   .icon-btn { background: #e8eaee; color: #1c1e21; padding: 4px 8px; font-size: 12px; }
   #profile { padding: 12px; border-bottom: 1px solid #e3e5e9; background: #fafbfc; }
-  #users { list-style: none; margin: 0; padding: 0; overflow: auto; flex: 1; }
-  #users li { padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #f0f1f3; }
-  #users li:hover { background: #f4f5f7; }
-  #users li.active { background: #e6efff; }
+  .search { padding: 10px 12px; border-bottom: 1px solid #e3e5e9; }
+  .search input { margin: 0; }
+  .scroll { overflow: auto; flex: 1; }
+  .section-title { padding: 10px 12px 4px; font-size: 12px; color: #6b7280; text-transform: uppercase; }
+  .list { list-style: none; margin: 0; padding: 0; }
+  .list li { padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #f0f1f3; }
+  .list li:hover { background: #f4f5f7; }
+  .list li.active { background: #e6efff; }
   .u-name { display: block; }
   .u-tag { display: block; font-size: 12px; color: #6b7280; }
+  #search-results { border-bottom: 1px solid #e3e5e9; }
 
   #chat { flex: 1; display: flex; flex-direction: column; min-width: 0; }
   #chat-header { padding: 12px; border-bottom: 1px solid #e3e5e9; background: #fff; font-weight: 600; }
@@ -82,11 +87,19 @@
       <p id="p-error" style="color:#b91c1c; font-size:12px; min-height:16px; margin:6px 0 0"></p>
     </form>
 
-    <ul id="users"></ul>
+    <form class="search" id="search-form">
+      <input id="search-input" placeholder="Найти по username" autocomplete="off" />
+    </form>
+
+    <div class="scroll">
+      <div id="search-results" hidden></div>
+      <div class="section-title">Диалоги</div>
+      <ul class="list" id="chats"></ul>
+    </div>
   </aside>
 
   <main id="chat">
-    <div id="chat-header">Выберите собеседника</div>
+    <div id="chat-header">Найдите собеседника через поиск</div>
     <div id="messages"></div>
     <form id="composer" hidden>
       <textarea id="text" placeholder="Сообщение… Enter — отправить"></textarea>
@@ -103,6 +116,7 @@ let me = null;
 let peer = null;
 let poll = null;
 let isRegisterMode = false;
+let chats = new Map();
 
 async function api(path, { method = "GET", body } = {}) {
   const headers = {};
@@ -126,13 +140,10 @@ async function api(path, { method = "GET", body } = {}) {
   return data;
 }
 
-// FastAPI отдаёт ошибки валидации списком, а бизнес-ошибки строкой
 function describeError(data, res) {
   const detail = data && data.detail;
   if (typeof detail === "string") return detail;
-  if (Array.isArray(detail)) {
-    return detail.map((e) => e.msg).join("; ");
-  }
+  if (Array.isArray(detail)) return detail.map((e) => e.msg).join("; ");
   return res.statusText || "Неизвестная ошибка";
 }
 
@@ -183,7 +194,7 @@ async function start() {
   renderMe();
   $("auth").hidden = true;
   $("app").hidden = false;
-  await loadUsers();
+  renderChats();
 }
 
 function renderMe() {
@@ -211,17 +222,23 @@ $("profile").onsubmit = async (e) => {
     });
     renderMe();
     $("profile").hidden = true;
-    await loadUsers();
   } catch (err) {
     $("p-error").textContent = err.message;
   }
 };
 
-async function loadUsers() {
-  const users = await api("/app/users");
-  const ul = $("users");
+function renderChats() {
+  const ul = $("chats");
   ul.innerHTML = "";
-  users.filter((u) => u.id !== me.id).forEach((u) => {
+  if (chats.size === 0) {
+    const li = document.createElement("li");
+    li.textContent = "Найдите собеседника через поиск";
+    li.style.cursor = "default";
+    li.style.color = "#6b7280";
+    ul.appendChild(li);
+    return;
+  }
+  chats.forEach((u) => {
     const li = document.createElement("li");
     const name = document.createElement("span");
     name.className = "u-name";
@@ -230,19 +247,67 @@ async function loadUsers() {
     tag.className = "u-tag";
     tag.textContent = "@" + u.username;
     li.append(name, tag);
-    li.dataset.id = u.id;
     if (peer && peer.id === u.id) li.classList.add("active");
     li.onclick = () => openDialog(u);
     ul.appendChild(li);
   });
 }
 
+function renderSearchResults(results) {
+  const box = $("search-results");
+  box.innerHTML = "";
+  box.hidden = false;
+  if (results.length === 0) {
+    const p = document.createElement("div");
+    p.className = "section-title";
+    p.textContent = "Никого не найдено";
+    box.appendChild(p);
+    return;
+  }
+  const ul = document.createElement("ul");
+  ul.className = "list";
+  results.forEach((u) => {
+    const li = document.createElement("li");
+    const name = document.createElement("span");
+    name.className = "u-name";
+    name.textContent = u.display_name;
+    const tag = document.createElement("span");
+    tag.className = "u-tag";
+    tag.textContent = "@" + u.username;
+    li.append(name, tag);
+    li.onclick = () => {
+      clearSearch();
+      openDialog(u);
+    };
+    ul.appendChild(li);
+  });
+  box.appendChild(ul);
+}
+
+function clearSearch() {
+  $("search-input").value = "";
+  $("search-results").hidden = true;
+  $("search-results").innerHTML = "";
+}
+
+$("search-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const q = $("search-input").value.trim();
+  if (!q) return;
+  try {
+    const results = await api(`/app/users/search?query=${encodeURIComponent(q)}`);
+    renderSearchResults(results);
+  } catch (err) {
+    alert(err.message);
+  }
+};
+
 function openDialog(user) {
+  chats.set(user.id, user);
   peer = user;
+  renderChats();
   $("chat-header").textContent = user.display_name + " @" + user.username;
   $("composer").hidden = false;
-  document.querySelectorAll("#users li").forEach((li) =>
-    li.classList.toggle("active", Number(li.dataset.id) === user.id));
   $("messages").innerHTML = "";
   loadMessages();
   clearInterval(poll);
@@ -276,12 +341,13 @@ async function loadMessages() {
 }
 
 function logout() {
-  token = null; me = null; peer = null;
+  token = null; me = null; peer = null; chats = new Map();
   localStorage.removeItem("token");
   clearInterval(poll);
   $("app").hidden = true;
   $("auth").hidden = false;
   $("profile").hidden = true;
+  clearSearch();
   setMode(false);
 }
 

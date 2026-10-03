@@ -20,6 +20,12 @@ class UserService:
             raise UsernameTaken
         return user
 
+    def search_users(self, current_user_id: int, query: str, limit: int = 20) -> list[UsersTable]:
+        query = query.strip().lower()
+        if not query:
+            return []
+        return self.repo.search_by_username(query, current_user_id, limit)
+
     def update_profile(self, user: UsersTable, username: str | None, display_name: str | None) -> UsersTable:
         if username is not None and username != user.username:
             if self.repo.get_by_username(username) is not None:
@@ -34,6 +40,3 @@ class UserService:
         if user is None or not verify_password(password, user.password_hash):
             raise InvalidCredentials
         return create_access_token(user.id)
-
-    def list_users(self, limit: int = 100, offset: int = 0) -> list[UsersTable]:
-        return self.repo.list(limit=limit, offset=offset)

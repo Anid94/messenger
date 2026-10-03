@@ -20,9 +20,17 @@ class UsersRepo:
     def get_by_username(self, username: str) -> UsersTable | None:
         return self.db.scalar(select(UsersTable).where(UsersTable.username == username))
 
-    def list(self, limit: int = 100, offset: int = 0) -> list[UsersTable]:
-        result = select(UsersTable).order_by(UsersTable.id).limit(limit).offset(offset)
-        return list(self.db.scalars(result))
+    def search_by_username(self, query: str, exclude_id: int, limit: int = 20) -> list[UsersTable]:
+        escaped = (query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_"))
+        pattern = escaped + "%"
+        stmt = (
+            select(UsersTable)
+            .where(UsersTable.username.like(pattern, escape="\\"))
+            .where(UsersTable.id != exclude_id)
+            .order_by(UsersTable.username)
+            .limit(limit)
+        )
+        return list(self.db.scalars(stmt))
 
     def create(self, email: str, username: str, display_name: str, password_hash: str) -> UsersTable | None:
         user = UsersTable(email=email, username=username, display_name=display_name, password_hash=password_hash)

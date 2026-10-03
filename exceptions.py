@@ -28,3 +28,8 @@ class UserNotFound(AppError):
 class CannotMessageSelf(AppError):
     status_code: int = 400
     detail: str = "Cannot send message to yourself"
+
+
+class UsernameTaken(AppError):
+    status_code: int = 409
+    detail: str = "Username already taken"

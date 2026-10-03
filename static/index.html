@@ -9,21 +9,29 @@
   [hidden] { display: none !important; }
   body { margin: 0; font: 15px/1.4 system-ui, sans-serif; background: #f4f5f7; color: #1c1e21; }
   .center { min-height: 100vh; display: grid; place-items: center; }
-  .card { background: #fff; padding: 24px; border-radius: 12px; width: 340px; box-shadow: 0 6px 24px rgba(0,0,0,.08); }
+  .card { background: #fff; padding: 24px; border-radius: 12px; width: 360px; box-shadow: 0 6px 24px rgba(0,0,0,.08); }
   h2 { margin: 0 0 16px; font-size: 18px; }
   input, textarea, button { font: inherit; }
   input, textarea { width: 100%; padding: 10px; border: 1px solid #d0d3d8; border-radius: 8px; margin-bottom: 10px; }
   button { padding: 9px 14px; border: 0; border-radius: 8px; background: #2563eb; color: #fff; cursor: pointer; }
   button.ghost { background: #e8eaee; color: #1c1e21; }
+  .link { background: none; color: #2563eb; padding: 0; margin-top: 10px; text-decoration: underline; }
+  .hint { font-size: 12px; color: #6b7280; margin: -6px 0 10px; }
   #error { color: #b91c1c; font-size: 13px; min-height: 18px; margin: 0; }
 
   #app { display: flex; height: 100vh; }
-  #sidebar { width: 270px; border-right: 1px solid #e3e5e9; background: #fff; display: flex; flex-direction: column; }
-  .me { padding: 12px; border-bottom: 1px solid #e3e5e9; font-size: 13px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  #sidebar { width: 280px; border-right: 1px solid #e3e5e9; background: #fff; display: flex; flex-direction: column; }
+  .me { padding: 12px; border-bottom: 1px solid #e3e5e9; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .me-name { font-weight: 600; font-size: 14px; }
+  .me-tag { font-size: 12px; color: #6b7280; }
+  .icon-btn { background: #e8eaee; color: #1c1e21; padding: 4px 8px; font-size: 12px; }
+  #profile { padding: 12px; border-bottom: 1px solid #e3e5e9; background: #fafbfc; }
   #users { list-style: none; margin: 0; padding: 0; overflow: auto; flex: 1; }
   #users li { padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #f0f1f3; }
   #users li:hover { background: #f4f5f7; }
   #users li.active { background: #e6efff; }
+  .u-name { display: block; }
+  .u-tag { display: block; font-size: 12px; color: #6b7280; }
 
   #chat { flex: 1; display: flex; flex-direction: column; min-width: 0; }
   #chat-header { padding: 12px; border-bottom: 1px solid #e3e5e9; background: #fff; font-weight: 600; }
@@ -40,13 +48,16 @@
 
 <div id="auth" class="center">
   <div class="card">
-    <h2>Мессенджер</h2>
+    <h2 id="auth-title">Вход</h2>
     <input id="email" type="email" placeholder="email" autocomplete="username" />
-    <input id="password" type="password" placeholder="пароль" autocomplete="current-password" />
-    <div style="display:flex; gap:8px;">
-      <button id="btn-login" style="flex:1">Войти</button>
-      <button id="btn-reg" class="ghost" style="flex:1">Регистрация</button>
+    <div id="reg-fields" hidden>
+      <input id="username" placeholder="username" autocomplete="off" />
+      <p class="hint">Латиница, цифры и подчёркивание, от 3 символов, начинается с буквы</p>
+      <input id="display-name" placeholder="Как вас показывать" autocomplete="off" />
     </div>
+    <input id="password" type="password" placeholder="пароль" autocomplete="current-password" />
+    <button id="btn-submit" style="width:100%">Войти</button>
+    <button id="btn-mode" class="link">Нет аккаунта? Зарегистрироваться</button>
     <p id="error"></p>
   </div>
 </div>
@@ -54,16 +65,31 @@
 <div id="app" hidden>
   <aside id="sidebar">
     <div class="me">
-      <span id="me-email"></span>
-      <button id="btn-logout" class="ghost" style="padding:4px 8px; font-size:12px">Выйти</button>
+      <div>
+        <span class="me-name" id="me-name"></span>
+        <span class="me-tag" id="me-tag"></span>
+      </div>
+      <div style="display:flex; gap:6px">
+        <button id="btn-profile" class="icon-btn">Профиль</button>
+        <button id="btn-logout" class="icon-btn">Выйти</button>
+      </div>
     </div>
+
+    <form id="profile" hidden>
+      <input id="p-display" placeholder="Отображаемое имя" />
+      <input id="p-username" placeholder="username" />
+      <button type="submit" style="width:100%">Сохранить</button>
+      <p id="p-error" style="color:#b91c1c; font-size:12px; min-height:16px; margin:6px 0 0"></p>
+    </form>
+
     <ul id="users"></ul>
   </aside>
+
   <main id="chat">
     <div id="chat-header">Выберите собеседника</div>
     <div id="messages"></div>
     <form id="composer" hidden>
-      <textarea id="text" placeholder="Сообщение… (Enter — отправить)"></textarea>
+      <textarea id="text" placeholder="Сообщение… Enter — отправить"></textarea>
       <button type="submit">Отправить</button>
     </form>
   </main>
@@ -73,9 +99,10 @@
 const $ = (id) => document.getElementById(id);
 
 let token = localStorage.getItem("token");
-let me = null;      // текущий пользователь
-let peer = null;    // собеседник
-let poll = null;    // таймер автообновления диалога
+let me = null;
+let peer = null;
+let poll = null;
+let isRegisterMode = false;
 
 async function api(path, { method = "GET", body } = {}) {
   const headers = {};
@@ -94,41 +121,115 @@ async function api(path, { method = "GET", body } = {}) {
 
   if (!res.ok) {
     if (res.status === 401) logout();
-    const detail = data && data.detail;
-    throw new Error(typeof detail === "string" ? detail : (raw || res.statusText));
+    throw new Error(describeError(data, res));
   }
   return data;
 }
 
-function showError(msg) { $("error").textContent = msg || ""; }
+// FastAPI отдаёт ошибки валидации списком, а бизнес-ошибки строкой
+function describeError(data, res) {
+  const detail = data && data.detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail.map((e) => e.msg).join("; ");
+  }
+  return res.statusText || "Неизвестная ошибка";
+}
 
-async function login(path, body) {
-  showError("");
+function setMode(register) {
+  isRegisterMode = register;
+  $("reg-fields").hidden = !register;
+  $("auth-title").textContent = register ? "Регистрация" : "Вход";
+  $("btn-submit").textContent = register ? "Создать аккаунт" : "Войти";
+  $("btn-mode").textContent = register
+    ? "Уже есть аккаунт? Войти"
+    : "Нет аккаунта? Зарегистрироваться";
+  $("error").textContent = "";
+}
+
+$("btn-mode").onclick = () => setMode(!isRegisterMode);
+
+$("btn-submit").onclick = async () => {
+  $("error").textContent = "";
+  const email = $("email").value;
+  const password = $("password").value;
+
   try {
-    const data = await api(path, { method: "POST", body });
+    if (isRegisterMode) {
+      await api("/app/users/reg", {
+        method: "POST",
+        body: {
+          email,
+          password,
+          username: $("username").value,
+          display_name: $("display-name").value,
+        },
+      });
+    }
+    const data = await api("/app/users/auth", {
+      method: "POST",
+      body: { email, password },
+    });
     token = data.access_token;
     localStorage.setItem("token", token);
     await start();
   } catch (e) {
-    showError(e.message);
+    $("error").textContent = e.message;
   }
-}
+};
 
 async function start() {
   me = await api("/app/users/me");
-  $("me-email").textContent = `${me.email} (#${me.id})`;
+  renderMe();
   $("auth").hidden = true;
   $("app").hidden = false;
   await loadUsers();
 }
 
+function renderMe() {
+  $("me-name").textContent = me.display_name;
+  $("me-tag").textContent = "@" + me.username;
+  $("p-display").value = me.display_name;
+  $("p-username").value = me.username;
+}
+
+$("btn-profile").onclick = () => {
+  $("profile").hidden = !$("profile").hidden;
+  $("p-error").textContent = "";
+};
+
+$("profile").onsubmit = async (e) => {
+  e.preventDefault();
+  $("p-error").textContent = "";
+  try {
+    me = await api("/app/users/me", {
+      method: "PATCH",
+      body: {
+        display_name: $("p-display").value,
+        username: $("p-username").value,
+      },
+    });
+    renderMe();
+    $("profile").hidden = true;
+    await loadUsers();
+  } catch (err) {
+    $("p-error").textContent = err.message;
+  }
+};
+
 async function loadUsers() {
   const users = await api("/app/users");
   const ul = $("users");
   ul.innerHTML = "";
-  users.filter(u => u.id !== me.id).forEach(u => {
+  users.filter((u) => u.id !== me.id).forEach((u) => {
     const li = document.createElement("li");
-    li.textContent = `${u.email} (#${u.id})`;
+    const name = document.createElement("span");
+    name.className = "u-name";
+    name.textContent = u.display_name;
+    const tag = document.createElement("span");
+    tag.className = "u-tag";
+    tag.textContent = "@" + u.username;
+    li.append(name, tag);
     li.dataset.id = u.id;
     if (peer && peer.id === u.id) li.classList.add("active");
     li.onclick = () => openDialog(u);
@@ -138,9 +239,9 @@ async function loadUsers() {
 
 function openDialog(user) {
   peer = user;
-  $("chat-header").textContent = `${user.email} (#${user.id})`;
+  $("chat-header").textContent = user.display_name + " @" + user.username;
   $("composer").hidden = false;
-  document.querySelectorAll("#users li").forEach(li =>
+  document.querySelectorAll("#users li").forEach((li) =>
     li.classList.toggle("active", Number(li.dataset.id) === user.id));
   $("messages").innerHTML = "";
   loadMessages();
@@ -180,22 +281,9 @@ function logout() {
   clearInterval(poll);
   $("app").hidden = true;
   $("auth").hidden = false;
+  $("profile").hidden = true;
+  setMode(false);
 }
-
-$("btn-login").onclick = () => login("/app/users/auth", {
-  email: $("email").value, password: $("password").value,
-});
-
-$("btn-reg").onclick = async () => {
-  showError("");
-  const creds = { email: $("email").value, password: $("password").value };
-  try {
-    await api("/app/users/reg", { method: "POST", body: creds });
-    await login("/app/users/auth", creds);   // после регистрации сразу логиним
-  } catch (e) {
-    showError(e.message);
-  }
-};
 
 $("btn-logout").onclick = logout;
 
@@ -223,6 +311,7 @@ $("text").addEventListener("keydown", (e) => {
 });
 
 (async function init() {
+  setMode(false);
   if (!token) return;
   try { await start(); } catch { logout(); }
 })();

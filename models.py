@@ -25,6 +25,19 @@ class UsersTable(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
+    sent_contacts = relationship(
+        "ContactsTable",
+        foreign_keys="ContactsTable.requester_id",
+        cascade="all",
+        passive_deletes=True,
+    )
+    received_contacts = relationship(
+        "ContactsTable",
+        foreign_keys="ContactsTable.addressee_id",
+        cascade="all",
+        passive_deletes=True,
+    )
+
     __table_args__ = (
         UniqueConstraint("username", name="uq_users_username"),
     )
@@ -34,8 +47,8 @@ class MessagesTable(Base):
     __tablename__ = "messages"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    sender_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
-    recipient_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    sender_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    recipient_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     text: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
@@ -45,13 +58,12 @@ class MessagesTable(Base):
     )
 
 
-
 class ContactsTable(Base):
     __tablename__ = "contacts"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    requester_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"))
-    addressee_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"))
+    requester_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    addressee_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     status: Mapped[str] = mapped_column(String(14), default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -63,24 +75,4 @@ class ContactsTable(Base):
         UniqueConstraint("requester_id", "addressee_id", name="uq_requester_addressee_pair"),
         Index("ix_contacts_addressee", "addressee_id")
     )
-
-
-'''class ContactsTable(Base):
-    __tablename__ = "contacts"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    requester_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
-    addressee_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    responded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
-
-    __table_args__ = (
-        UniqueConstraint("requester_id", "addressee_id", name="uq_contacts_pair"),
-        Index("ix_contacts_addressee", "addressee_id"),
-    )'''
-
-
-
-
 

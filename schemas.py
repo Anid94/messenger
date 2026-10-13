@@ -97,3 +97,14 @@ class MessageRead(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ContactCreate(BaseModel):
+    addressee_id: int = Field(gt=0)
+
+
+class ContactRead(BaseModel):
+    id: int
+    status: str
+    created_at: datetime
+    peer: UserPublic

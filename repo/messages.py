@@ -19,7 +19,12 @@ class MessagesRepo:
         self.db.refresh(message)
         return message
 
-    def get_dialog(self, user_a: int, user_b: int, limit: int = 50, before_id: int | None = None) -> list[MessagesTable]:
+    def get_dialog(self,
+                   user_a: int,
+                   user_b: int,
+                   limit: int = 50,
+                   before_id: int | None = None
+    ) -> list[MessagesTable]:
         pair = or_(
             and_(
                 MessagesTable.sender_id == user_a,

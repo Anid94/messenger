@@ -14,13 +14,19 @@ class UsersRepo:
             select(UsersTable).where(UsersTable.email == email)
         )
 
-    def get_by_id(self, user_id) -> UsersTable | None:
-        return self.db.get(UsersTable, user_id)
+    def get_by_id(self, user_id: int) -> UsersTable | None:
+        #!Взять на карандаш, написал сам после первого блока по sqlalchemy
+        return self.db.scalar(select(UsersTable).where(UsersTable.id == user_id))
 
     def get_by_username(self, username: str) -> UsersTable | None:
         return self.db.scalar(select(UsersTable).where(UsersTable.username == username))
 
-    def search_by_username(self, query: str, exclude_id: int, limit: int = 20) -> list[UsersTable]:
+    def search_by_username(
+            self,
+            query: str,
+            exclude_id: int,
+            limit: int = 20
+    ) -> list[UsersTable]:
         escaped = (query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_"))
         pattern = escaped + "%"
         stmt = (
@@ -32,8 +38,19 @@ class UsersRepo:
         )
         return list(self.db.scalars(stmt))
 
-    def create(self, email: str, username: str, display_name: str, password_hash: str) -> UsersTable | None:
-        user = UsersTable(email=email, username=username, display_name=display_name, password_hash=password_hash)
+    def create(
+            self,
+            email: str,
+            username: str,
+            display_name: str,
+            password_hash: str
+    ) -> UsersTable | None:
+        user = UsersTable(
+            email=email,
+            username=username,
+            display_name=display_name,
+            password_hash=password_hash
+        )
         self.db.add(user)
         try:
             self.db.commit()
@@ -43,7 +60,12 @@ class UsersRepo:
         self.db.refresh(user)
         return user
 
-    def update_profile(self, user: UsersTable, username: str | None, display_name: str | None) -> UsersTable | None:
+    def update_profile(
+            self,
+            user: UsersTable,
+            username: str | None,
+            display_name: str | None
+    ) -> UsersTable | None:
         if username is not None:
             user.username = username
         if display_name is not None:

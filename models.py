@@ -10,7 +10,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
 
@@ -43,3 +43,44 @@ class MessagesTable(Base):
         Index("ix_messages_sender_recipient_created", "sender_id", "recipient_id", "created_at"),
         Index("ix_messages_recipient_sender_created", "recipient_id", "sender_id", "created_at"),
     )
+
+
+
+class ContactsTable(Base):
+    __tablename__ = "contacts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    requester_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"))
+    addressee_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"))
+    status: Mapped[str] = mapped_column(String(14), default="pending")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    requester = relationship("UsersTable", foreign_keys=[requester_id])
+    addressee = relationship("UsersTable", foreign_keys=[addressee_id])
+
+    __table_args__ = (
+        UniqueConstraint("requester_id", "addressee_id", name="uq_requester_addressee_pair"),
+        Index("ix_contacts_addressee", "addressee_id")
+    )
+
+
+'''class ContactsTable(Base):
+    __tablename__ = "contacts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    requester_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    addressee_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    responded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("requester_id", "addressee_id", name="uq_contacts_pair"),
+        Index("ix_contacts_addressee", "addressee_id"),
+    )'''
+
+
+
+
+

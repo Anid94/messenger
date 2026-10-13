@@ -33,3 +33,18 @@ class CannotMessageSelf(AppError):
 class UsernameTaken(AppError):
     status_code: int = 409
     detail: str = "Username already taken"
+
+
+class ContactAlreadyExists(AppError):
+    status_code: int = 409
+    detail = "Contact already exists"
+
+
+class ContactRequestNotFound(AppError):
+    status_code: int = 404
+    detail: str = "Contact requests not found"
+
+
+class CannotAddSelf(AppError):
+    status_code: int = 409
+    detail: str = "Cannot add self"

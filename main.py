@@ -5,7 +5,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from exceptions import AppError
-from routes import users, messages
+from routes import users, messages, contacts
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -19,6 +19,7 @@ async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
 
 app.include_router(users.router)
 app.include_router(messages.router)
+app.include_router(contacts.router)
 
 #Для css
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

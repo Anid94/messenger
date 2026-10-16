@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models import UsersTable
+from repo.contacts import ContactsRepo
 from repo.messages import MessagesRepo
 from repo.users import UsersRepo
 from routes.dependencies import get_current_user
@@ -13,7 +14,7 @@ router = APIRouter(prefix="/app/messages", tags=["messages"])
 
 
 def get_message_service(db: Session = Depends(get_db)) -> MessageService:
-    return MessageService(MessagesRepo(db), UsersRepo(db))
+    return MessageService(MessagesRepo(db), UsersRepo(db), ContactsRepo(db))
 
 @router.post(
     "",

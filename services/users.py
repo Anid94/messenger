@@ -2,6 +2,7 @@ from exceptions import EmailAlreadyRegistered, InvalidCredentials, UsernameTaken
 from models import UsersTable
 from repo.users import UsersRepo
 from security import hash_password, verify_password, create_access_token
+from sqlalchemy.exc import IntegrityError
 
 
 class UserService:
@@ -13,11 +14,20 @@ class UserService:
             raise EmailAlreadyRegistered
         if self.repo.get_by_username(username) is not None:
             raise UsernameTaken
-        user = self.repo.create(email=email, username=username, display_name=display_name, password_hash=hash_password(password))
-        if user is None:
+        user = self.repo.create(
+            email=email,
+            username=username,
+            display_name=display_name,
+            password_hash=hash_password(password)
+        )
+        try:
+            self.repo.db.commit()
+        except IntegrityError:
+            self.repo.db.rollback()
             if self.repo.get_by_email(email) is not None:
                 raise EmailAlreadyRegistered
             raise UsernameTaken
+        self.repo.db.refresh(user)
         return user
 
     def search_users(self, current_user_id: int, query: str, limit: int = 20) -> list[UsersTable]:
@@ -30,10 +40,15 @@ class UserService:
         if username is not None and username != user.username:
             if self.repo.get_by_username(username) is not None:
                 raise UsernameTaken
-        updated = self.repo.update_profile(user, username, display_name)
-        if updated is None:
+        self.repo.update_profile(user, username, display_name)
+        try:
+            self.repo.db.commit()
+        except IntegrityError:
+            self.repo.db.rollback()
+            self.repo.db.expire(user)
             raise UsernameTaken
-        return updated
+        self.repo.db.refresh(user)
+        return user
 
     def authenticate(self, email: str, password: str) -> str:
         user = self.repo.get_by_email(email)

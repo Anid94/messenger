@@ -1,8 +1,9 @@
-from sqlalchemy import select, or_, and_
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
+from datetime import datetime
 
-from models import ContactsTable, UsersTable
+from sqlalchemy import select, or_, and_, exists
+from sqlalchemy.orm import Session
+
+from models import ContactsTable
 
 
 class ContactsRepo:
@@ -26,33 +27,60 @@ class ContactsRepo:
         )
         return self.db.scalar(select(ContactsTable).where(pair))
 
-    def create(
-            self,
-            requester_id: int,
-            addressee_id: int,
-    ) -> ContactsTable | None:
+    def get_by_id(self, contact_id: int) -> ContactsTable:
+        return self.db.get(ContactsTable, contact_id)
+
+    def create(self, requester_id: int, addressee_id: int) -> ContactsTable:
         contact = ContactsTable(
             requester_id=requester_id,
             addressee_id=addressee_id,
-            status="pending"
+            status="pending",
         )
         self.db.add(contact)
-        try:
-            self.db.commit()
-        except IntegrityError:
-            self.db.rollback()
-            return None
-        self.db.refresh(contact)
         return contact
 
-    def list_incoming(
-            self,
-            user: UsersTable,
-            contact: ContactsTable,
-    ) -> list[ContactsTable] | None:
+    def list_incoming(self, user_id: int) -> list[ContactsTable]:
         stmt = (
-            select(contact, user).join(user, contact.requester_id == user.id)
-            .where(contact.status == "pending")
+            select(ContactsTable)
+            .where(ContactsTable.addressee_id == user_id)
+            .where(ContactsTable.status == "pending")
         )
+        return list(self.db.scalars(stmt))
 
-        return self.db.scalars(stmt).all()
+    def list_contacts(self, user_id: int) -> list[ContactsTable]:
+        stmt = select(ContactsTable).where(
+            or_(
+                ContactsTable.requester_id == user_id,
+                ContactsTable.addressee_id == user_id,
+            )
+        ).where(ContactsTable.status == "accepted")
+        return list(self.db.scalars(stmt))
+
+    def accept(self, contact: ContactsTable) -> ContactsTable:
+        contact.status = "accepted"
+        contact.responded_at = datetime.now()
+        return contact
+
+    def decline(self, contact: ContactsTable) -> None:
+        self.db.delete(contact)
+
+    def delete(self, contact: ContactsTable) -> None:
+        self.db.delete(contact)
+
+    def has_accepted(self, my_id: int, user_id: int) -> bool:
+        pair = or_(
+            and_(
+                ContactsTable.requester_id == my_id,
+                ContactsTable.addressee_id == user_id,
+            ),
+            and_(
+                ContactsTable.requester_id == user_id,
+                ContactsTable.addressee_id == my_id,
+            ),
+        )
+        stmt = (
+            select(ContactsTable)
+            .where(pair)
+            .where(ContactsTable.status == "accepted")
+        )
+        return self.db.scalar(select(exists(stmt)))

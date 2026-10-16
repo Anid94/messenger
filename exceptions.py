@@ -37,7 +37,7 @@ class UsernameTaken(AppError):
 
 class ContactAlreadyExists(AppError):
     status_code: int = 409
-    detail = "Contact already exists"
+    detail: int = "Contact already exists"
 
 
 class ContactRequestNotFound(AppError):
@@ -46,5 +46,10 @@ class ContactRequestNotFound(AppError):
 
 
 class CannotAddSelf(AppError):
-    status_code: int = 409
+    status_code: int = 400
     detail: str = "Cannot add self"
+
+
+class NotContact(AppError):
+    status_code: int = 403
+    detail: str = "Not in contacts"

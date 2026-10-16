@@ -14,9 +14,8 @@ class UsersRepo:
             select(UsersTable).where(UsersTable.email == email)
         )
 
-    def get_by_id(self, user_id: int) -> UsersTable | None:
-        #!Взять на карандаш, написал сам после первого блока по sqlalchemy
-        return self.db.scalar(select(UsersTable).where(UsersTable.id == user_id))
+    def get_by_id(self, user_id: int) -> UsersTable:
+        return self.db.get(UsersTable, user_id)
 
     def get_by_username(self, username: str) -> UsersTable | None:
         return self.db.scalar(select(UsersTable).where(UsersTable.username == username))
@@ -52,12 +51,6 @@ class UsersRepo:
             password_hash=password_hash
         )
         self.db.add(user)
-        try:
-            self.db.commit()
-        except IntegrityError:
-            self.db.rollback()
-            return None
-        self.db.refresh(user)
         return user
 
     def update_profile(
@@ -70,10 +63,4 @@ class UsersRepo:
             user.username = username
         if display_name is not None:
             user.display_name = display_name
-        try:
-            self.db.commit()
-        except IntegrityError:
-            self.db.rollback()
-            return None
-        self.db.refresh(user)
         return user

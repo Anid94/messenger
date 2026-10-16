@@ -15,8 +15,6 @@ class MessagesRepo:
             text=text,
         )
         self.db.add(message)
-        self.db.commit()
-        self.db.refresh(message)
         return message
 
     def get_dialog(self,

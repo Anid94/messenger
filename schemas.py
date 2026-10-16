@@ -105,6 +105,10 @@ class ContactCreate(BaseModel):
 
 class ContactRead(BaseModel):
     id: int
+    requester_id: int
+    addressee_id: int
     status: str
     created_at: datetime
-    peer: UserPublic
+    responded_at: datetime | None
+
+    model_config = ConfigDict(from_attributes=True)

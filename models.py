@@ -28,12 +28,14 @@ class UsersTable(Base):
     sent_contacts = relationship(
         "ContactsTable",
         foreign_keys="ContactsTable.requester_id",
+        back_populates="requester",
         cascade="all",
         passive_deletes=True,
     )
     received_contacts = relationship(
         "ContactsTable",
         foreign_keys="ContactsTable.addressee_id",
+        back_populates="addressee",
         cascade="all",
         passive_deletes=True,
     )
@@ -68,8 +70,16 @@ class ContactsTable(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    requester = relationship("UsersTable", foreign_keys=[requester_id])
-    addressee = relationship("UsersTable", foreign_keys=[addressee_id])
+    requester = relationship(
+        "UsersTable",
+        foreign_keys=[requester_id],
+        back_populates="sent_contacts",
+    )
+    addressee = relationship(
+        "UsersTable",
+        foreign_keys=[addressee_id],
+        back_populates="received_contacts",
+    )
 
     __table_args__ = (
         UniqueConstraint("requester_id", "addressee_id", name="uq_requester_addressee_pair"),
